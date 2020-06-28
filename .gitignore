@@ -1,0 +1,9 @@
+
+*.log
+*.dat
+*.cached
+
+.idea/
+pretrained/
+__pycache__/
+state_dict/
