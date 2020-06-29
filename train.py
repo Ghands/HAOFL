@@ -17,7 +17,8 @@ from torch.utils.data import DataLoader, random_split
 from transformers import BertModel
 
 from models import *
-from data_utils import build_tokenizer, build_embedding_matrix, LongDataset, Tokenizer4Bert
+from data_utils import build_tokenizer, build_embedding_matrix, Tokenizer4Bert, TrainDataset
+from config import log_dir, with_position_models
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -25,34 +26,28 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 class Runner(object):
-    def __init__(self, opt, dataset_tail):
+    def __init__(self, opt, dtl_param):
         self.opt = opt
 
-        bert_tokenizer = Tokenizer4Bert(opt.max_bert_len, 'bert-base-uncased')
-        tokenizer = build_tokenizer(
-            fnames=[opt.dataset_file['train'], opt.dataset_file['test']],
-            max_seq_len=opt.max_seq_len,
-            dat_fname='normal_tokenizer.dat'
-        )
-        embedding_matrix = build_embedding_matrix(
-            word2idx=tokenizer.word2idx,
-            embed_dim=opt.embed_dim,
-            dat_fname='{0}_embedding_matrix.dat'.format(str(opt.embed_dim))
-        )
-        if 'bert' in opt.model_name:
-
-            self.model = opt.model_class(opt).to(opt.device)
+        if 'bert' in self.opt.model_name:
+            tokenizer = Tokenizer4Bert(opt.max_seq_len, 'bert-base-uncased')
+            # TODO: Add the instance of bert based model
         else:
-            self.model = opt.model_class(embedding_matrix, opt).to(opt.device)
+            tokenizer = build_tokenizer(
+                fnames=[opt.dataset_file['train'], opt.dataset_file['test']],
+                max_seq_len=opt.max_seq_len,
+                dat_fname='normal_tokenizer.dat'
+            )
+            embedding_matrix = build_embedding_matrix(
+                word2idx=tokenizer.word2idx,
+                embed_dim=opt.embed_dim,
+                dat_fname='{0}_embedding_matrix.dat'.format(str(opt.embed_dim))
+            )
+            self.model = opt.model_class(opt, tokenizer, embedding_matrix).to(opt.device)
 
-        self.train_set = LongDataset(opt.dataset_file['train'], tokenizer, bert_tokenizer, opt, dataset_tail)
-        self.test_set = LongDataset(opt.dataset_file['test'], tokenizer, bert_tokenizer, opt, dataset_tail)
-        assert 0 <= opt.valset_ratio < 1
-        if opt.valset_ratio > 0:
-            valset_len = int(len(self.train_set) * opt.valset_ratio)
-            self.train_set, self.val_set = random_split(self.train_set, (len(self.train_set) - valset_len, valset_len))
-        else:
-            self.val_set = self.test_set
+        self.train_set = TrainDataset(opt.dataset_file['train'], tokenizer, opt, opt.dtl_method, dtl_param,
+                                      opt.name_tail)
+        self.val_set = TrainDataset(opt.dataset_file['test'], tokenizer, opt, opt.dtl_method, dtl_param, opt.name_tail)
 
         if opt.device.type == 'cuda':
             logger.info('cuda memory allocated: {}'.format(torch.cuda.memory_allocated(device=opt.device.index)))
@@ -99,8 +94,14 @@ class Runner(object):
                 # clear gradient accumulators
                 optimizer.zero_grad()
 
-                inputs = [sample_batched[col].to(self.opt.device) for col in self.opt.inputs_cols]
-                outputs = self.model(inputs)
+                if self.opt.model_name in with_position_models:
+                    inputs = {"text": sample_batched["text"].to(self.opt.device),
+                              'aspect': sample_batched['aspect'].to(self.opt.device),
+                              'position': sample_batched['position'].to(self.opt.device)}
+                else:
+                    inputs = {"text": sample_batched["text"].to(self.opt.device),
+                              "aspect": sample_batched['aspect'].to(self.opt.device)}
+                outputs = self.model(self.opt.dtl_method, self.opt.dpl_mode, train=True, inputs=inputs)
                 targets = sample_batched['polarity'].to(self.opt.device)
 
                 loss = criterion(outputs, targets)
@@ -136,9 +137,15 @@ class Runner(object):
         self.model.eval()
         with torch.no_grad():
             for t_batch, t_sample_batched in enumerate(data_loader):
-                t_inputs = [t_sample_batched[col].to(self.opt.device) for col in self.opt.inputs_cols]
+                if self.opt.model_name in with_position_models:
+                    t_inputs = {"text": t_sample_batched["text"].to(self.opt.device),
+                                'aspect': t_sample_batched['aspect'].to(self.opt.device),
+                                'position': t_sample_batched['position'].to(self.opt.device)}
+                else:
+                    t_inputs = {"text": t_sample_batched["text"].to(self.opt.device),
+                                "aspect": t_sample_batched['aspect'].to(self.opt.device)}
                 t_targets = t_sample_batched['polarity'].to(self.opt.device)
-                t_outputs = self.model(t_inputs)
+                t_outputs = self.model(self.opt.dtl_method, self.opt.dpl_mode, train=True, inputs=t_inputs)
 
                 n_correct += (torch.argmax(t_outputs, -1) == t_targets).sum().item()
                 n_total += len(t_outputs)
@@ -161,23 +168,41 @@ class Runner(object):
         optimizer = self.opt.optimizer(_params, lr=self.opt.learning_rate, weight_decay=self.opt.l2reg)
 
         train_data_loader = DataLoader(dataset=self.train_set, batch_size=self.opt.batch_size, shuffle=True)
-        test_data_loader = DataLoader(dataset=self.test_set, batch_size=self.opt.batch_size, shuffle=False)
         val_data_loader = DataLoader(dataset=self.val_set, batch_size=self.opt.batch_size, shuffle=False)
 
         self._reset_params()
         best_model_path = self._train(criterion, optimizer, train_data_loader, val_data_loader)
         self.model.load_state_dict(torch.load(best_model_path))
         self.model.eval()
-        test_acc, test_f1 = self._evaluate_acc_f1(test_data_loader)
+        test_acc, test_f1 = self._evaluate_acc_f1(val_data_loader)  # val dataset is the test dataset
         logger.info('>> test_acc: {:.4f}, test_f1: {:.4f}'.format(test_acc, test_f1))
 
 
 def main():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument('--model_name', default='lstm_base', type=str, help='The name of running model')
-    parser.add_argument('--window_size', default=3, type=int, help='The number of sentences a window contains')
-    parser.add_argument('--window_num', default=5, type=int, help='The number of windows')
+    parser.add_argument('--model_name', default='baseline', type=str, help='The name of running model')
+
+    # Parameters about DTL layer
+    parser.add_argument('--dtl_method', default='filter', type=str,
+                        help='The data transformation method used in DTL layer, possible values are: splitting, '
+                             'sliding, filter')
+    parser.add_argument('--split_size', default=400, type=int,
+                        help='The size of text slices that obtained by splitting window')
+    parser.add_argument('--slide_size', default=400, type=int,
+                        help='The size of text slices that obtained by sliding window')
+    parser.add_argument('--stride_size', default=200, type=int, help='The size of step when using sliding window')
+    parser.add_argument('--sentence_num', default=3, type=int,
+                        help='The max number of sentences of each text slice when using text filter')
+    parser.add_argument('--text_slice_num', default=5, type=int,
+                        help='The number of text slices that obtained by text filter')
+
+    # Parameters about DPL layer
+    parser.add_argument('--dpl_mode', default='encoder', type=str,
+                        help='The mode that DPL layer takes to process text slices, available values '
+                             'are: encoder, analysis')
+
+    # Usual hyper-parameters
     parser.add_argument('--embed_dim', default=300, type=int, help='The dimension of embedding')
     parser.add_argument('--hidden_dim', default=300, type=int, help='The dimension of hidden state')
     parser.add_argument('--polarities_dim', default=3, type=int, help='The dimension of logits')
@@ -192,15 +217,18 @@ def main():
     parser.add_argument('--max_seq_len', default=200, type=int, help='The sequence length of each window')
     parser.add_argument('--device', default=None, type=str, help='The device to run model, e.g. cuda:1')
     parser.add_argument('--seed', default=None, type=int, help='The random seed')
-    parser.add_argument('--valset_ratio', default=0, type=float, help='The ratio of validation set')
-    parser.add_argument('--n_gpu', default=1, type=int, help='The number of gpus to support data parallel')
-    parser.add_argument('--max_bert_len', default=4000, type=int,
-                        help='The max length of a single text to input when bert used')
-    parser.add_argument('--slice_size', default=400, type=int, help='The size of a slice input to bert')
-    parser.add_argument('--slice_stride', default=400, type=int, help='The size of stride when get the next slice')
+    # parser.add_argument('--n_gpu', default=1, type=int, help='The number of gpus to support data parallel')
+    # parser.add_argument('--max_bert_len', default=4000, type=int,
+    #                     help='The max length of a single text to input when bert used')
     parser.add_argument('--hops', default=3, type=int, help='A hyper-parameter for MemNet and RAM')
+
+    # Parameters about dataset
+    parser.add_argument('--max_aspect_len', default=30, type=int, help='The max number of words that consist of aspect')
     parser.add_argument('--aspect_pos_len', default=40, type=int,
                         help='The position list of the aspect appears in text')
+    parser.add_argument('--batch', default=True, type=bool, help='Running model with mini-batch or not')
+    parser.add_argument('--fix_max_len', default=4000, type=int, help='The max words of full document')
+    parser.add_argument('--name_tail', default='', type=str, help='Short comment defined by user')
 
     opt = parser.parse_args()
 
@@ -213,88 +241,14 @@ def main():
         torch.backends.cudnn.benchmark = False
 
     model_classes = {
-        "lstm_base": StackLSTM,
-        'bert_base': BertBase,
-        'shared_lstm': SharedLSTM,
-        'bert_window': BertWindow,
-        'bert_filter': BertFilter,
-        'stack_atae': StackATAELSTM,
-        'stack_ian': StackIAN,
-        'stack_memnet': StackMemNet,
-        'stack_ram': StackRAM,
-        'stack_tnet': StackTNET,
-        'stack_aoa': StackAOA,
-        'stack_mgan': StackMGAN,
-        'shared_aoa': SharedAOA,
-        'shared_atae': SharedATAELSTM,
-        'shared_ian': SharedIan,
-        'shared_memnet': SharedMemNet,
-        'shared_ram': SharedRAM,
-        'shared_tnet': SharedTNET,
-        'shared_mgan': SharedMGAN,
-        'normal_lstm': NormalLSTM,
-        'normal_atae': NormalATAE,
-        'normal_ian': NormalIAN,
-        'normal_memnet': NormalMemNet,
-        'normal_ram': NormalRAM,
-        'normal_tnet': NormalTNET,
-        'normal_aoa': NormalAOA,
-        'normal_mgan': NormalMGAN,
-        'bert_high_filter': BertHighFilter,
-        'slice_lstm': SliceLSTM,
-        'slice_atae': SliceATAELSTM,
-        'slice_ian': SliceIan,
-        'slice_memnet': SliceMemNet,
-        'slice_ram': SliceRAM,
-        'slice_tnet': SliceTNET,
-        'slice_aoa': SliceAOA,
-        'slice_mgan': SliceMGAN
+        'baseline': BaseHAOFL
     }
 
     dataset_files = {
-        "local": {
+        "document-level": {
             "train": "./datasets/train.raw",
             "test": "./datasets/test.raw"
         }
-    }
-
-    input_cols = {
-        'lstm_base': ["context_window_indices", "aspect_indices"],
-        'bert_base': ["bert_text_indices", "bert_aspect_indices"],
-        'shared_lstm': ["context_window_indices", "aspect_indices"],
-        'bert_window': ["bert_window_indices", "bert_aspect_indices"],
-        'bert_filter': ["bert_text_indices", "bert_aspect_indices"],
-        'stack_atae': ["context_window_indices", "aspect_indices"],
-        'stack_ian': ["context_window_indices", "aspect_indices"],
-        'stack_memnet': ["no_aspect_context_window_indices", "aspect_indices"],
-        'stack_ram': ["context_window_indices", "aspect_indices", "position_tuple_list"],
-        'stack_tnet': ["context_window_indices", "aspect_indices", "position_tuple_list"],
-        'stack_aoa': ["context_window_indices", "aspect_indices"],
-        'stack_mgan': ["context_window_indices", "aspect_indices", "position_tuple_list"],
-        'shared_aoa': ["context_window_indices", "aspect_indices"],
-        'shared_atae': ["context_window_indices", "aspect_indices"],
-        'shared_ian': ["context_window_indices", "aspect_indices"],
-        'shared_memnet': ["no_aspect_context_window_indices", "aspect_indices"],
-        'shared_ram': ["context_window_indices", "aspect_indices", "shared_pos_tuple_list"],
-        'shared_tnet': ["context_window_indices", "aspect_indices", "shared_pos_tuple_list"],
-        'shared_mgan': ["context_window_indices", "aspect_indices", "shared_pos_tuple_list"],
-        'normal_lstm': ["raw_text_indices", "aspect_indices"],
-        'normal_atae': ["raw_text_indices", "aspect_indices"],
-        'normal_ian': ["raw_text_indices", "aspect_indices"],
-        'normal_memnet': ["raw_text_no_aspect_indices", "aspect_indices"],
-        'normal_ram': ["raw_text_indices", "aspect_indices", "full_position_tuple_list"],
-        'normal_tnet': ["raw_text_indices", "aspect_indices", "full_position_tuple_list"],
-        'normal_aoa': ["raw_text_indices", "aspect_indices"],
-        'normal_mgan': ["raw_text_indices", "aspect_indices", "full_position_tuple_list"],
-        'bert_high_filter': ["bert_text_indices", "bert_aspect_indices"],
-        'slice_lstm': ["slice_text_tuple_list", "aspect_indices"],
-        'slice_atae': ["slice_text_tuple_list", "aspect_indices"],
-        'slice_ian': ["slice_text_tuple_list", "aspect_indices"],
-        'slice_memnet': ["raw_text_no_aspect_indices", "aspect_indices"],
-        'slice_ram': ["slice_text_tuple_list", "aspect_indices", "slice_position_tuple_list"],
-        'slice_tnet': ["slice_text_tuple_list", "aspect_indices", "slice_position_tuple_list"],
-        'slice_aoa': ["slice_text_tuple_list", "aspect_indices"],
-        'slice_mgan': ["slice_text_tuple_list", "aspect_indices", "slice_position_tuple_list"],
     }
 
     initializers = {
@@ -314,32 +268,22 @@ def main():
     }
 
     opt.model_class = model_classes[opt.model_name]
-    opt.dataset_file = dataset_files['local']
-    opt.inputs_cols = input_cols[opt.model_name]
+    opt.dataset_file = dataset_files['document-level']
     opt.initializer = initializers[opt.initializer]
     opt.optimizer = optimizers[opt.optimizer]
     opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') \
         if opt.device is None else torch.device(opt.device)
 
-    if 'slice' in opt.model_name:
-        log_file = './running_logs/{}-{}-slice-{}-{}.log'.format(opt.model_name, strftime("%y%m%d-%H%M", localtime()),
-                                                                 opt.slice_size, opt.slice_stride)
-        dataset_tail = '-slice-{}-{}'.format(opt.slice_size, opt.slice_stride)
-    elif 'normal' in opt.model_name:
-        log_file = './running_logs/{}-{}.log'.format(opt.model_name, strftime("%y%m%d-%H%M", localtime()))
-        dataset_tail = ''
-    elif 'window' in opt.model_name:
-        log_file = './running_logs/{}-{}-window-{}-{}.log'.format(opt.model_name, strftime("%y%m%d-%H%M", localtime()),
-                                                                  opt.window_size, opt.window_num)
-        dataset_tail = '-window-{}-{}'.format(opt.window_size, opt.window_num)
-    elif 'bert' in opt.model_name:
-        log_file = './running_logs/{}-{}-slice-{}-{}.log'.format(opt.model_name, strftime("%y%m%d-%H%M", localtime()),
-                                                                 opt.slice_size, opt.slice_stride)
-        dataset_tail = '-slice-{}-{}'.format(opt.slice_size, opt.slice_stride)
+    if opt.dtl_method == "splitting":
+        dtl_param = opt.split_size
+    elif opt.dtl_method == "sliding":
+        dtl_param = '{}@{}'.format(opt.slide_size, opt.stride_size)
+    elif opt.dtl_method == 'filter':
+        dtl_param = '{}@{}'.format(opt.sentence_num, opt.text_slice_num)
     else:
-        log_file = './running_logs/{}-{}-window-{}-{}.log'.format(opt.model_name, strftime("%y%m%d-%H%M", localtime()),
-                                                                  opt.window_size, opt.window_num)
-        dataset_tail = '-window-{}-{}'.format(opt.window_size, opt.window_num)
+        raise ValueError("The value of `trans_method` is not supported!")
+    log_file = '{}/{}_{}-{}_{}.log'.format(log_dir, opt.model_name, opt.dtl_method, dtl_param,
+                                           strftime("%y%m%d-%H%M", localtime()))
 
     fmt = '%(asctime)s: %(message)s'
     format_str = logging.Formatter(fmt)
@@ -347,7 +291,7 @@ def main():
     log_fh.setFormatter(format_str)
     logger.addHandler(log_fh)
 
-    runner = Runner(opt, dataset_tail)
+    runner = Runner(opt, dtl_param)
     runner.run()
 
 

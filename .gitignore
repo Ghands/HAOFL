@@ -2,8 +2,11 @@
 *.log
 *.dat
 *.cached
+glove*
 
 .idea/
 pretrained/
 __pycache__/
 state_dict/
+running_logs/
+datasets/

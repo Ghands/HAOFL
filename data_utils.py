@@ -2,12 +2,13 @@
 
 import os
 import torch
-import spacy
 import pickle
 import numpy as np
 
+from config import spacy_nlp, normal_process_models, without_aspect_models, with_position_models
 from torch.utils.data import Dataset
 from transformers import BertTokenizer
+from models import NormalDTLLayer, NoAspectDTLLayer, PositionDTLLayer
 
 
 def build_tokenizer(fnames, max_seq_len, dat_fname):
@@ -131,19 +132,11 @@ class Tokenizer4Bert(object):
         return pad_and_truncate(sequence, maxlen, padding=padding, truncating=truncating)
 
 
-class LongDataset(Dataset):
-    def __init__(self, file_name, tokenizer, bert_tokenizer, opt, dataset_tail):
-        super(LongDataset, self).__init__()
+class TrainDataset(Dataset):
+    def __init__(self, file_name, tokenizer, opt, trans_method, dtl_param, name_tail):
+        super(TrainDataset, self).__init__()
 
-        window_size = opt.window_size
-        back_pos = (window_size - 1) // 2
-        forward_pos = (window_size + 2) // 2
-        window_num = opt.window_num
-
-        if len(dataset_tail) == 0:
-            cached_file_name = "{}.cached".format(file_name)
-        else:
-            cached_file_name = "{}_{}.cached".format(file_name, dataset_tail)
+        cached_file_name = '{}_{}-{}_{}.cached'.format(file_name, trans_method, dtl_param, name_tail)
         if os.path.exists(cached_file_name):
             all_data = torch.load(cached_file_name)
         else:
@@ -152,164 +145,43 @@ class LongDataset(Dataset):
             fin.close()
 
             all_data = list()
-            nlp = spacy.load('en_core_web_sm')
 
-            for line_num in range(0, len(all_lines), 3):
-                text = all_lines[line_num].strip()
-                aspect = all_lines[line_num + 1].strip()
-                polarity = all_lines[line_num + 2].strip()
+            if opt.model_name in normal_process_models:
+                text_processor = NormalDTLLayer(opt, tokenizer)
+            elif opt.model_name in without_aspect_models:
+                text_processor = NoAspectDTLLayer(opt, tokenizer)
+            elif opt.model_name in with_position_models:
+                text_processor = PositionDTLLayer(opt, tokenizer)
+            else:
+                raise ValueError("Unsupported model, please check the variables in file `config.py`!")
 
-                sample_text = list()
-                bert_text = list()
-                sub_raw_text = list()
-                no_aspect_sample_text = list()
-                all_sentences = [item.text for item in nlp(text).sents]
-                for idx, context in enumerate(all_sentences):
-                    if len(sample_text) > window_num:
-                        break
-                    if aspect in context:
-                        sample_text.append(tokenizer.text_to_sequence(
-                            all_sentences[max(0, idx - back_pos): idx + forward_pos]))
-                        no_aspect_sample_text.append(tokenizer.text_to_sequence(
-                            [temp_sentence.replace(aspect, "") for temp_sentence in
-                             all_sentences[max(0, idx - back_pos): idx + forward_pos]]))
-                        bert_text.append(bert_tokenizer.text_to_sequence(
-                            all_sentences[max(0, idx - back_pos): idx + forward_pos], maxlen=opt.max_seq_len))
-                        sub_raw_text.append(" ".join(all_sentences[max(0, idx - back_pos): idx + forward_pos]))
-                assert len(sample_text) == len(bert_text)
-                if len(sample_text) < window_num:
-                    now_length = len(sample_text)
-                    sample_text.extend([tokenizer.text_to_sequence('')] * (window_num - now_length))
-                    no_aspect_sample_text.extend([tokenizer.text_to_sequence('')] * (window_num - now_length))
-                    bert_text.extend(
-                        [bert_tokenizer.text_to_sequence('', maxlen=opt.max_seq_len)] * (window_num - now_length))
-                elif len(sample_text) > window_num:
-                    sample_text = sample_text[:window_num]
-                    no_aspect_sample_text = no_aspect_sample_text[:window_num]
-                    bert_text = bert_text[:window_num]
-                    sub_raw_text = sub_raw_text[:window_num]
-                assert len(sample_text) == len(bert_text)
-                assert len(sample_text) == len(no_aspect_sample_text)
-                sample_text = np.asarray(sample_text, dtype=np.int64)
-                no_aspect_sample_text = np.asarray(no_aspect_sample_text, dtype=np.int64)
+            full_x_str = list()
+            full_aspect = list()
+            full_polarity = list()
+            for i in range(0, len(all_lines), 3):
+                full_x_str.append(all_lines[i].strip())
+                full_aspect.append(all_lines[i + 1].strip())
+                full_polarity.append(all_lines[i + 2].strip())
 
-                # bert_text_indices = bert_tokenizer.text_to_sequence(text)
-                bert_aspect_indices = bert_tokenizer.text_to_sequence(aspect, maxlen=20)
-                bert_window_indices = np.asarray(bert_text, dtype=np.int64)
-
-                raw_text_indices = tokenizer.text_to_sequence(text, maxlen=opt.max_bert_len)
-                raw_text_no_aspect_indices = tokenizer.text_to_sequence(text.replace(aspect, ""), maxlen=opt.max_bert_len)
-
-                position_tuple_list = []
-                find_res = text.find(aspect)
-                while find_res != -1:
-                    t1 = np.sum(tokenizer.text_to_sequence(text[:find_res], maxlen=opt.max_bert_len) != 0).item()
-                    t2 = np.sum(tokenizer.text_to_sequence(text[:find_res + len(aspect)], maxlen=opt.max_bert_len) != 0).item()
-                    position_tuple_list.append(t1)
-                    position_tuple_list.append(t2)
-                    find_res = text.find(aspect, find_res + len(aspect))
-                position_tuple_list.append(-1)
-                if len(position_tuple_list) < opt.aspect_pos_len:
-                    position_tuple_list.extend([-1] * (opt.aspect_pos_len - len(position_tuple_list)))
-                else:
-                    position_tuple_list = position_tuple_list[:opt.aspect_pos_len]
-                position_tuple_list = np.asarray(position_tuple_list, dtype=np.int64)
-
-                part_pos_tuple_list = []
-                for idx, sub_raw in enumerate(sub_raw_text):
-                    part_res = sub_raw.find(aspect)
-                    while part_res != -1:
-                        t1 = np.sum(tokenizer.text_to_sequence(sub_raw[:part_res]) != 0).item()
-                        t2 = np.sum(tokenizer.text_to_sequence(sub_raw[:part_res + len(aspect)]) != 0).item()
-                        part_pos_tuple_list.append(t1 + idx * tokenizer.max_seq_len)
-                        part_pos_tuple_list.append(t2 + idx * tokenizer.max_seq_len)
-                        part_res = sub_raw.find(aspect, part_res + len(aspect))
-                part_pos_tuple_list.append(-1)
-                if len(part_pos_tuple_list) < opt.aspect_pos_len:
-                    part_pos_tuple_list.extend([-1] * (opt.aspect_pos_len - len(part_pos_tuple_list)))
-                else:
-                    part_pos_tuple_list = part_pos_tuple_list[:opt.aspect_pos_len]
-                part_pos_tuple_list = np.asarray(part_pos_tuple_list, dtype=np.int64)
-
-                shared_pos_tuple_list = []
-                for idx, sub_raw in enumerate(sub_raw_text):
-                    share_res = sub_raw.find(aspect)
-                    sub_pos_list = []
-                    while share_res != -1:
-                        t1 = np.sum(tokenizer.text_to_sequence(sub_raw[:share_res]) != 0).item()
-                        t2 = np.sum(tokenizer.text_to_sequence(sub_raw[:share_res + len(aspect)]) != 0).item()
-                        sub_pos_list.append(t1)
-                        sub_pos_list.append(t2)
-                        share_res = sub_raw.find(aspect, share_res + len(aspect))
-                    sub_pos_list.append(-1)
-                    if len(sub_pos_list) < opt.aspect_pos_len:
-                        sub_pos_list.extend([-1] * (opt.aspect_pos_len - len(sub_pos_list)))
-                    else:
-                        sub_pos_list = sub_pos_list[:opt.aspect_pos_len]
-                    shared_pos_tuple_list.append(sub_pos_list)
-                if len(shared_pos_tuple_list) < opt.window_num:
-                    shared_pos_tuple_list.extend([[-1] * opt.aspect_pos_len for _ in range(0, opt.window_num - len(shared_pos_tuple_list))])
-                else:
-                    shared_pos_tuple_list = shared_pos_tuple_list[:opt.window_num]
-                shared_pos_tuple_list = np.asarray(shared_pos_tuple_list, dtype=np.int64)
-
-                total_slice_num = (opt.max_bert_len - opt.slice_size) // opt.slice_stride + 1
-                text_words = text.split(" ")
-                text_slices = list()
-                for i in range(total_slice_num):
-                    start = i * opt.slice_stride
-                    text_slices.append(text_words[start: start + opt.slice_size])
-                slice_pos_tuple_list = list()
-                slice_text_tuple_list = list()
-                bert_text_tuple_list = list()
-                for idx, sub_words in enumerate(text_slices):
-                    sub_pos_list = []
-                    if len(sub_words) == 0:
-                        sub_pos_list.extend([-1] * (opt.aspect_pos_len - len(sub_pos_list)))
-                        sub_text_list = tokenizer.text_to_sequence("", maxlen=opt.slice_size + 30)
-                        sub_bert_list = bert_tokenizer.text_to_sequence("", maxlen=opt.slice_size + 50)
-                    else:
-                        sub_raw = " ".join(sub_words)
-                        slice_res = sub_raw.find(aspect)
-                        while slice_res != -1:
-                            t1 = np.sum(tokenizer.text_to_sequence(sub_raw[:slice_res], maxlen=opt.slice_size + 30) != 0).item()
-                            t2 = np.sum(tokenizer.text_to_sequence(sub_raw[:slice_res + len(aspect)], maxlen=opt.slice_size + 30) != 0).item()
-                            sub_pos_list.append(t1)
-                            sub_pos_list.append(t2)
-                            slice_res = sub_raw.find(aspect, slice_res + len(aspect))
-                        sub_pos_list.append(-1)
-                        if len(sub_pos_list) < opt.aspect_pos_len:
-                            sub_pos_list.extend([-1] * (opt.aspect_pos_len - len(sub_pos_list)))
-                        else:
-                            sub_pos_list = sub_pos_list[:opt.aspect_pos_len]
-                        sub_text_list = tokenizer.text_to_sequence(sub_raw, maxlen=opt.slice_size + 30)
-                        sub_bert_list = bert_tokenizer.text_to_sequence(sub_raw, maxlen=opt.slice_size + 50)
-                    slice_pos_tuple_list.append(sub_pos_list)
-                    slice_text_tuple_list.append(sub_text_list)
-                    bert_text_tuple_list.append(sub_bert_list)
-                slice_pos_tuple_list = np.asarray(slice_pos_tuple_list, dtype=np.int64)
-                slice_text_tuple_list = np.asarray(slice_text_tuple_list, dtype=np.int64)
-                bert_text_tuple_list = np.asarray(bert_text_tuple_list, dtype=np.int64)
-
-                data = {
-                    "context_window_indices": sample_text,
-                    "aspect_indices": tokenizer.text_to_sequence(aspect),
-                    "polarity": int(polarity) + 1,
-                    'bert_text_indices': bert_text_tuple_list,
-                    'bert_aspect_indices': bert_aspect_indices,
-                    'bert_window_indices': bert_window_indices,
-                    "no_aspect_context_window_indices": no_aspect_sample_text,
-                    "raw_text_indices": raw_text_indices,
-                    "raw_text_no_aspect_indices": raw_text_no_aspect_indices,
-                    'full_position_tuple_list': position_tuple_list,
-                    'position_tuple_list': part_pos_tuple_list,
-                    "shared_pos_tuple_list": shared_pos_tuple_list,
-                    'slice_position_tuple_list': slice_pos_tuple_list,
-                    'slice_text_tuple_list': slice_text_tuple_list
-                }
-
-                all_data.append(data)
-
+            if opt.model_name in with_position_models:
+                text_slices, aspect_positions, aspect_tokens = text_processor(full_x_str, full_aspect, trans_method)
+                for single_slices, single_positions, single_aspect, single_polarity in zip(text_slices, aspect_positions, aspect_tokens, full_polarity):
+                    single_data = {
+                        "text": single_slices,
+                        "position": single_positions,
+                        "aspect": single_aspect,
+                        "polarity": int(single_polarity) + 1
+                    }
+                    all_data.append(single_data)
+            else:
+                text_slices, aspect_tokens = text_processor(full_x_str, full_aspect, trans_method)
+                for single_slices, single_aspect, single_polarity in zip(text_slices, aspect_tokens, full_polarity):
+                    single_data = {
+                        "text": single_slices,
+                        "aspect": single_aspect,
+                        "polarity": int(single_polarity) + 1
+                    }
+                    all_data.append(single_data)
             torch.save(all_data, cached_file_name)
 
         self.data = all_data

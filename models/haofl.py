@@ -9,7 +9,7 @@ from models import DTLLayer, DPLLayer, SALLayer
 
 class BaseDPL(DPLLayer):
     def __init__(self, embedding_matrix, opt):
-        super(BaseDPL, self).__init__()
+        super(BaseDPL, self).__init__(opt)
 
         self.embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float))
         self.squeeze_embed = SqueezeEmbedding()
@@ -66,13 +66,16 @@ class BaseHAOFL(nn.Module):
         self.dpl = BaseDPL(embedding_matrix, opt)
         self.sal = BaseSAL(opt)
 
-    def forward(self, x_str, aspect_str, trans_method, dpl_mode):
-        text_slices, aspect_tokens = self.dtl(x_str, aspect_str, trans_method)
+    def forward(self, trans_method, dpl_mode, train=False, **kwargs):
+        inputs = kwargs["inputs"]
+        text_slices, aspect_tokens = inputs['text'], inputs['aspect']
+        if not train:
+            text_slices, aspect_tokens = self.dtl(text_slices, aspect_tokens, trans_method)
         result, group = self.dpl(dpl_mode, text_slices, aspect_tokens, trans_method)
         if dpl_mode == "analysis":
             final = result
         else:
-            true_batch_size = len(x_str)
+            true_batch_size = len(text_slices)
             slice_num = text_slices.size(1)
             final = self.sal(result, group, true_batch_size, slice_num, dpl_mode)
 

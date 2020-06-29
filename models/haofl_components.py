@@ -63,7 +63,7 @@ class DTLLayer(nn.Module):
 
         total_slices = list()
         for single_str in x_str:
-            total_slices.append(self.single_text_splitting(single_str, size, stride))
+            total_slices.append(self.single_text_slidding(single_str, size, stride))
 
         return np.asarray(total_slices, dtype=np.int64)
 
@@ -87,7 +87,7 @@ class DTLLayer(nn.Module):
                         self.tokenizer.text_to_sequence(all_sentences[max(0, idx - back_pos): idx + forward_pos]))
         return aspect_sentences
 
-    def text_filter(self, x_str, aspect_str):
+    def text_filter(self, x_str, aspect_str, **kwargs):
         if type(x_str) not in (list, tuple):
             raise TypeError("The input must be LIST type or TUPLE type")
         if type(aspect_str) not in (list, tuple):
@@ -100,14 +100,19 @@ class DTLLayer(nn.Module):
 
         total_slices = list()
         for single_str, single_aspect in zip(x_str, aspect_str):
-            total_slices.append(self.single_text_filter(single_str, aspect_str, back_pos, forward_pos, text_slice_num))
+            total_slices.append(self.single_text_filter(single_str, single_aspect, back_pos, forward_pos, text_slice_num))
 
         return np.asarray(total_slices, dtype=np.int64)
 
     def tokenize_aspect(self, aspect_str):
-        return self.tokenizer.text_to_sequence(aspect_str, maxlen=self.opt.max_aspect_len)
+        aspect_tokens = list()
+        for item in aspect_str:
+            aspect_tokens.append(self.tokenizer.text_to_sequence(item, maxlen=self.opt.max_aspect_len))
+        return np.asarray(aspect_tokens, dtype=np.int64)
 
     def forward(self, x_str, aspect_str, trans_method):
+        assert len(x_str) == len(aspect_str)
+
         if trans_method == "splitting":
             text_slices = self.splitting_window(x_str)
         elif trans_method == "sliding":
@@ -123,8 +128,10 @@ class DTLLayer(nn.Module):
 
 
 class DPLLayer(nn.Module):
-    def __init__(self):
+    def __init__(self, opt):
         super(DPLLayer, self).__init__()
+
+        self.opt = opt
 
     def encoder_mode(self, text_slices, aspect_tokens):
         raise NotImplementedError("The encoder mode must be implemented according to the logic of used model!")
@@ -167,6 +174,7 @@ class SALLayer(nn.Module):
         super(SALLayer, self).__init__()
 
         self.dense = nn.Linear(opt.hidden_dim, opt.polarities_dim)
+        self.opt = opt
 
     def sal_model(self, result_vector, result_len):
         raise NotImplementedError("The SAL must be implemented!")
