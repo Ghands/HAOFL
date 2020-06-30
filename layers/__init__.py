@@ -1,6 +1,5 @@
 # coding:utf-8
 
-from layers.dynamic_rnn import DynamicLSTM
-from layers.squeeze_embedding import SqueezeEmbedding
-
-from layers.attention import Attention, NoQueryAttention
+from layers.dtl_types import DTLLayer, NormalDTLLayer, NoAspectDTLLayer, PositionDTLLayer
+from layers.dpl_types import DPLLayer, PositionDPLLayer
+from layers.sal_types import SALLayer, NormalSALLayer, FixedSALLayer

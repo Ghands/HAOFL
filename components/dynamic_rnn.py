@@ -12,7 +12,7 @@ class DynamicLSTM(nn.Module):
 
         :param input_size:The number of expected features in the input x
         :param hidden_size:The number of features in the hidden state h
-        :param num_layers:Number of recurrent layers.
+        :param num_layers:Number of recurrent components.
         :param bias:If False, then the layer does not use bias weights b_ih and b_hh. Default: True
         :param batch_first:If True, then the input and output tensors are provided as (batch, seq, feature)
         :param dropout:If non-zero, introduces a dropout layer on the outputs of each RNN layer except the last layer

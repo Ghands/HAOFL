@@ -13,7 +13,7 @@ import torch.nn as nn
 
 from sklearn import metrics
 from time import strftime, localtime
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader
 from transformers import BertModel
 
 from models import *
@@ -241,7 +241,14 @@ def main():
         torch.backends.cudnn.benchmark = False
 
     model_classes = {
-        'baseline': BaseHAOFL
+        'baseline': BaselineHAOFL,
+        'atae': ATAEHAOFL,
+        'ian': IANHAOFL,
+        'memnet': MemNetHAOFL,
+        'ram': RAMHAOFL,
+        'tnet': TNETHAOFL,
+        'aoa': AOAHAOFL,
+        'mgan': MGANHAOFL
     }
 
     dataset_files = {

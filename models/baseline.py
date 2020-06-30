@@ -1,15 +1,16 @@
-# coding: utf-8
+# coding:utf-8
 
 import torch
 import torch.nn as nn
 
-from layers import DynamicLSTM, SqueezeEmbedding
-from models import DTLLayer, DPLLayer, SALLayer
+from components import SqueezeEmbedding, DynamicLSTM
+from layers import DPLLayer
+from frameworks import HAOFL
 
 
-class BaseDPL(DPLLayer):
+class BaselineDPL(DPLLayer):
     def __init__(self, embedding_matrix, opt):
-        super(BaseDPL, self).__init__(opt)
+        super(BaselineDPL, self).__init__(opt)
 
         self.embed = nn.Embedding.from_pretrained(torch.tensor(embedding_matrix, dtype=torch.float))
         self.squeeze_embed = SqueezeEmbedding()
@@ -46,37 +47,9 @@ class BaseDPL(DPLLayer):
         return x[0]
 
 
-class BaseSAL(SALLayer):
-    def __init__(self, opt):
-        super(BaseSAL, self).__init__(opt)
-
-        self.agg_lstm = DynamicLSTM(opt.hidden_dim, opt.hidden_dim, num_layers=1, batch_first=True)
-
-    def sal_model(self, result_vector, result_len):
-        _, (x, _) = self.agg_lstm(result_vector, result_len)
-
-        return x[0]
-
-
-class BaseHAOFL(nn.Module):
+class BaselineHAOFL(HAOFL):
     def __init__(self, opt, tokenizer, embedding_matrix):
-        super(BaseHAOFL, self).__init__()
+        super(BaselineHAOFL, self).__init__(opt, tokenizer, embedding_matrix, 1)
 
-        self.dtl = DTLLayer(opt, tokenizer)
-        self.dpl = BaseDPL(embedding_matrix, opt)
-        self.sal = BaseSAL(opt)
-
-    def forward(self, trans_method, dpl_mode, train=False, **kwargs):
-        inputs = kwargs["inputs"]
-        text_slices, aspect_tokens = inputs['text'], inputs['aspect']
-        if not train:
-            text_slices, aspect_tokens = self.dtl(text_slices, aspect_tokens, trans_method)
-        result, group = self.dpl(dpl_mode, text_slices, aspect_tokens, trans_method)
-        if dpl_mode == "analysis":
-            final = result
-        else:
-            true_batch_size = len(text_slices)
-            slice_num = text_slices.size(1)
-            final = self.sal(result, group, true_batch_size, slice_num, dpl_mode)
-
-        return final
+    def set_dpl(self, embedding_matrix, opt):
+        return BaselineDPL(embedding_matrix, opt)
