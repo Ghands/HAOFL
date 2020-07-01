@@ -309,7 +309,7 @@ class PositionDTLLayer(DTLLayer):
                         t2 = np.sum(self.tokenizer.text_to_sequence(selected_sentences[:slice_res + len(aspect_str)]) != 0).item()
                         sub_pos_tuple.append(t1)
                         sub_pos_tuple.append(t2)
-                        slice_res = selected_sentences.find(aspect_str)
+                        slice_res = selected_sentences.find(aspect_str, slice_res + len(aspect_str))
                     sub_pos_tuple.append(-1)
                     if len(sub_pos_tuple) < self.opt.aspect_pos_len:
                         sub_pos_tuple.extend([-1] * (self.opt.aspect_pos_len - len(sub_pos_tuple)))
@@ -331,7 +331,7 @@ class PositionDTLLayer(DTLLayer):
                         t2 = np.sum(self.tokenizer.text_to_sequence(selected_sentences[:slice_res + len(aspect_str)]) != 0).item()
                         sub_pos_tuple.append(t1)
                         sub_pos_tuple.append(t2)
-                        slice_res = selected_sentences.find(aspect_str)
+                        slice_res = selected_sentences.find(aspect_str + len(aspect_str))
                     sub_pos_tuple.append(-1)
                     if len(sub_pos_tuple) < self.opt.aspect_pos_len:
                         sub_pos_tuple.extend([-1] * (self.opt.aspect_pos_len - len(sub_pos_tuple)))
@@ -365,9 +365,9 @@ class PositionDTLLayer(DTLLayer):
         assert len(x_str) == len(aspect_str)
 
         if trans_method == "splitting":
-            text_slices, aspect_positions  = self.splitting_window(x_str)
+            text_slices, aspect_positions = self.splitting_window(x_str, aspect_str=aspect_str)
         elif trans_method == "sliding":
-            text_slices, aspect_positions  = self.sliding_window(x_str)
+            text_slices, aspect_positions = self.sliding_window(x_str, aspect_str=aspect_str)
         elif trans_method == "filter":
             text_slices, aspect_positions = self.text_filter(x_str, aspect_str)
         else:

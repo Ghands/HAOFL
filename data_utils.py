@@ -8,7 +8,7 @@ import numpy as np
 from config import spacy_nlp, normal_process_models, without_aspect_models, with_position_models
 from torch.utils.data import Dataset
 from transformers import BertTokenizer
-from models import NormalDTLLayer, NoAspectDTLLayer, PositionDTLLayer
+from layers import NormalDTLLayer, NoAspectDTLLayer, PositionDTLLayer
 
 
 def build_tokenizer(fnames, max_seq_len, dat_fname):

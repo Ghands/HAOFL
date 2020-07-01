@@ -29,6 +29,8 @@ class AOADPL(DPLLayer):
         gamma = torch.matmul(alpha, beta.transpose(1, 2))
         x = torch.matmul(torch.transpose(x, 1, 2), gamma).squeeze(-1)
 
+        return x
+
     def encoder_mode(self, text_slices, aspect_tokens):
         x_len = torch.sum(text_slices != 0, dim=1)
         aspect_len = torch.sum(aspect_tokens != 0, dim=1)

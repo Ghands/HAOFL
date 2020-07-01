@@ -44,6 +44,9 @@ class RAMDPL(PositionDPLLayer):
                     u_value.append(
                         np.concatenate((np.arange(-pos_tuple[j], 0), np.zeros(pos_tuple[j + 1] - pos_tuple[j]),
                                         np.arange(1, total_len - pos_tuple[j + 1] + 1), np.zeros(seq_len - total_len))))
+                else:
+                    weight_value.append(np.ones(seq_len))
+                    u_value.append(np.ones(seq_len))
 
             weight_value = np.stack(weight_value).max(axis=0)
             u_value = np.stack(u_value).max(axis=0)

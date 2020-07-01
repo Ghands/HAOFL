@@ -31,7 +31,7 @@ class Runner(object):
 
         if 'bert' in self.opt.model_name:
             tokenizer = Tokenizer4Bert(opt.max_seq_len, 'bert-base-uncased')
-            # TODO: Add the instance of bert based model
+            self.model = opt.model_class(opt, tokenizer).to(opt.device)
         else:
             tokenizer = build_tokenizer(
                 fnames=[opt.dataset_file['train'], opt.dataset_file['test']],
@@ -248,7 +248,8 @@ def main():
         'ram': RAMHAOFL,
         'tnet': TNETHAOFL,
         'aoa': AOAHAOFL,
-        'mgan': MGANHAOFL
+        'mgan': MGANHAOFL,
+        'bert': BertHAOFL
     }
 
     dataset_files = {

@@ -46,10 +46,10 @@ class NormalSALLayer(SALLayer):
 
 
 class FixedSALLayer(SALLayer):
-    def __init__(self, opt, in_fixed_dim, out_fixed_dim):
+    def __init__(self, opt, fixed_dim):
         super(FixedSALLayer, self).__init__(opt)
 
-        self.agg_lstm = DynamicLSTM(in_fixed_dim, out_fixed_dim, num_layers=1, batch_first=True)
+        self.agg_lstm = DynamicLSTM(fixed_dim, fixed_dim, num_layers=1, batch_first=True)
 
     def sal_model(self, result_vector, result_len):
         _, (x, _) = self.agg_lstm(result_vector, result_len)

@@ -8,3 +8,5 @@ from models.ram_integrated import RAMHAOFL
 from models.tnet_integrated import TNETHAOFL
 from models.aoa_integrated import AOAHAOFL
 from models.mgan_integrated import MGANHAOFL
+
+from models.bert_integrated import BertHAOFL

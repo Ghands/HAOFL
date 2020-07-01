@@ -88,7 +88,7 @@ class TNETDPL(PositionDPLLayer):
 
 
 class TNETHAOFL(PositionFixedHAOFL):
-    def __init__(self, opt, tokenizer, embedding_matrix, fixed_dim):
+    def __init__(self, opt, tokenizer, embedding_matrix, fixed_dim=50):
         super(TNETHAOFL, self).__init__(opt, tokenizer, embedding_matrix, fixed_dim)
 
     def set_dpl(self, embedding_matrix, opt):

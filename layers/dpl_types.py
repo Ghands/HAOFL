@@ -62,6 +62,7 @@ class PositionDPLLayer(DPLLayer):
             true_batch_size = text_slices.size(0)
             x_shape = text_slices.size()
             text_slices = text_slices.flatten(0, 1).long()
+            pos_tuple = pos_tuple.flatten(0, 1)
             x_len = torch.sum(text_slices != 0, dim=-1)
             group = torch.arange(true_batch_size).unsqueeze(1).expand(true_batch_size, x_shape[1]).flatten().to(
                 self.opt.device)
@@ -69,6 +70,7 @@ class PositionDPLLayer(DPLLayer):
             aspect_tokens = aspect_tokens.expand(x_shape[1], aspect_size[0], aspect_size[1]).permute(1, 0, 2).flatten(0,
                                                                                                                       1)
             text_slices = text_slices[x_len != 0]
+            pos_tuple = pos_tuple[x_len != 0]
             group = group[x_len != 0]
             aspect_tokens = aspect_tokens[x_len != 0]
 
@@ -80,6 +82,7 @@ class PositionDPLLayer(DPLLayer):
 
             x_shape = text_slices.size()
             text_slices = text_slices.flatten(1, 2)
+            pos_tuple = pos_tuple.flatten(1, 2)
 
             result_vector = self.analysis_mode(text_slices, aspect_tokens, x_shape, pos_tuple=pos_tuple)
             return result_vector, None
