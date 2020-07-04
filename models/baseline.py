@@ -48,6 +48,7 @@ class BaselineDPL(DPLLayer):
 
 
 class BaselineHAOFL(HAOFL):
+    """A model constructed with HAOFL framework, LSTM is the model used in both DPL layer and SAL layer."""
     def __init__(self, opt, tokenizer, embedding_matrix):
         super(BaselineHAOFL, self).__init__(opt, tokenizer, embedding_matrix, 1)
 

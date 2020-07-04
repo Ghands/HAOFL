@@ -99,6 +99,7 @@ class RAMDPL(PositionDPLLayer):
 
 
 class RAMHAOFL(PositionHAOFL):
+    """A model constructed with HAOFL framework, RAM is the model used in DPL layer, and LSTM is used in SAL layer."""
     def __init__(self, opt, tokenizer, embedding_matrix):
         super(RAMHAOFL, self).__init__(opt, tokenizer, embedding_matrix, 1)
 

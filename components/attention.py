@@ -8,14 +8,16 @@ import torch.nn.functional as F
 
 class Attention(nn.Module):
     def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', dropout=0):
-        ''' Attention Mechanism
-        :param embed_dim:
-        :param hidden_dim:
-        :param out_dim:
-        :param n_head: num of head (Multi-Head Attention)
+        """
+        Basic Attention Mechanism
+        :param embed_dim: The dimension of single input vector
+        :param hidden_dim: The dimension of single vector during computation
+        :param out_dim: The dimension of single output vector
+        :param n_head: num of head, this parameter is set of multi-head attention
         :param score_function: scaled_dot_product / mlp (concat) / bi_linear (general dot)
-        :return (?, q_len, out_dim,)
-        '''
+        :return (batch_size, sequence_len, out_dim)
+        """
+
         super(Attention, self).__init__()
         if hidden_dim is None:
             hidden_dim = embed_dim // n_head
@@ -88,8 +90,10 @@ class Attention(nn.Module):
 
 
 class NoQueryAttention(Attention):
-    '''q is a parameter'''
     def __init__(self, embed_dim, hidden_dim=None, out_dim=None, n_head=1, score_function='dot_product', q_len=1, dropout=0):
+        """
+        The attention mechanism used in ATAELSTM
+        """
         super(NoQueryAttention, self).__init__(embed_dim, hidden_dim, out_dim, n_head, score_function, dropout)
         self.q_len = q_len
         self.q = nn.Parameter(torch.Tensor(q_len, embed_dim))

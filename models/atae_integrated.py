@@ -49,6 +49,7 @@ class ATAEDPL(DPLLayer):
 
 
 class ATAEHAOFL(HAOFL):
+    """A model constructed with HAOFL framework, ATAE is the model used in DPL layer, and LSTM is used in SAL layer."""
     def __init__(self, opt, tokenizer, embedding_matrix):
         super(ATAEHAOFL, self).__init__(opt, tokenizer, embedding_matrix, 1)
 

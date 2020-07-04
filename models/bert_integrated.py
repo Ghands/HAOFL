@@ -48,6 +48,7 @@ class BertDPL(DPLLayer):
 
 
 class BertHAOFL(HAOFL):
+    """A model constructed with HAOFL framework, BERT is the model used in DPL layer, and LSTM is used in SAL layer."""
     def __init__(self, opt, tokenizer):
         super(BertHAOFL, self).__init__(opt, tokenizer, None, 1)
 

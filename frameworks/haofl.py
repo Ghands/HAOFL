@@ -7,6 +7,14 @@ from layers import NormalDTLLayer, PositionDTLLayer, NormalSALLayer
 
 class HAOFL(nn.Module):
     def __init__(self, opt, tokenizer, embedding_matrix, times_hidden=1):
+        """
+        The basic HAOFL framework
+        :param opt: The instance contains all hyper-parameters
+        :param tokenizer: Word tokenizer
+        :param embedding_matrix: The word2vec dictionary contains all words used in document-level ABSC dataset.
+        :param times_hidden: The number of expanding the size of both the input vector of the final Dense layer
+        when adapting 'analysis' mode in DPL and the input vector of the SAL layer network
+        """
         super(HAOFL, self).__init__()
 
         self.dtl = NormalDTLLayer(opt, tokenizer)
@@ -35,6 +43,14 @@ class HAOFL(nn.Module):
 
 class PositionHAOFL(HAOFL):
     def __init__(self, opt, tokenizer, embedding_matrix, times_hidden=1):
+        """
+        The HAOFL framework with relative position encoding
+        :param opt: The instance contains all hyper-parameters
+        :param tokenizer: Word tokenizer
+        :param embedding_matrix: The word2vec dictionary contains all words used in document-level ABSC dataset.
+        :param times_hidden: The number of expanding the size of both the input vector of the final Dense layer
+        when adapting 'analysis' mode in DPL and the input vector of the SAL layer network
+        """
         super(PositionHAOFL, self).__init__(opt, tokenizer, embedding_matrix, times_hidden)
 
         self.dtl = PositionDTLLayer(opt, tokenizer)

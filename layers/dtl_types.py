@@ -10,6 +10,11 @@ from config import spacy_nlp
 
 class DTLLayer(nn.Module):
     def __init__(self, opt, tokenizer):
+        """
+        The basic Data Transformation Layer.
+        :param opt:
+        :param tokenizer:
+        """
         super(DTLLayer, self).__init__()
 
         self.opt = opt
@@ -17,9 +22,22 @@ class DTLLayer(nn.Module):
         self.fixed_size = opt.fix_max_len
 
     def text_preprocessing(self, x_str, **kwargs):
+        """
+        Pre-processing operations of input string.
+        :param x_str: The input string need to be pre-processing.
+        :param kwargs: ...
+        :return: Processed strings.
+        """
         raise NotImplementedError("You must implement the text preprocessing methods!")
 
     def single_text_splitting(self, single_str, size, **kwargs):
+        """
+        Splitting operations of single text.
+        :param single_str: The raw string.
+        :param size: The size of each splitted text slice.
+        :param kwargs: ...
+        :return: The tokens of each word orchestrated by slices.
+        """
         words = single_str.split(' ')
         if self.opt.batch:
             if len(words) < self.fixed_size:
@@ -35,6 +53,12 @@ class DTLLayer(nn.Module):
         return text_slices
 
     def splitting_window(self, x_str, **kwargs):
+        """
+        The splitting method.
+        :param x_str: All raw texts
+        :param kwargs: ...
+        :return: Processed tokens.
+        """
         if type(x_str) not in (list, tuple):
             raise TypeError("The input must be LIST type or TUPLE type")
 
@@ -47,6 +71,14 @@ class DTLLayer(nn.Module):
         return np.asarray(total_slices, dtype=np.int64)
 
     def single_text_slidding(self, single_str, size, stride, **kwargs):
+        """
+        Sliding window operations of single text
+        :param single_str: The raw string.
+        :param size: The size of the window
+        :param stride: The size of each step
+        :param kwargs: ...
+        :return: The tokens of each word orchestrated by slices.
+        """
         words = single_str.split(' ')
         if self.opt.batch:
             if len(words) < self.fixed_size:
@@ -62,6 +94,12 @@ class DTLLayer(nn.Module):
         return text_slices
 
     def sliding_window(self, x_str, **kwargs):
+        """
+        The sliding window method.
+        :param x_str: All raw texts.
+        :param kwargs: ...
+        :return: Processed tokens.
+        """
         if type(x_str) not in (list, tuple):
             raise TypeError("The input must be LIST type or TUPLE type")
 
@@ -75,6 +113,16 @@ class DTLLayer(nn.Module):
         return np.asarray(total_slices, dtype=np.int64)
 
     def single_text_filter(self, single_str, aspect_str, back_pos, forward_pos, text_slice_num, **kwargs):
+        """
+        Text filter operations on single text
+        :param single_str: The raw string
+        :param aspect_str: The raw aspect
+        :param back_pos: The number of previous sentences of the chosen sentence.
+        :param forward_pos: The number of following sentences of the chosen sentence.
+        :param text_slice_num: The number of final text slices
+        :param kwargs: ...
+        :return: The tokens of each word orchestrated by slices.
+        """
         all_sentences = [item.text for item in spacy_nlp(single_str).sents]
         aspect_sentences = list()
         if self.opt.batch:
@@ -95,6 +143,13 @@ class DTLLayer(nn.Module):
         return aspect_sentences
 
     def text_filter(self, x_str, aspect_str, **kwargs):
+        """
+        The text filter method
+        :param x_str: All raw texts
+        :param aspect_str: All raw aspects
+        :param kwargs: ...
+        :return: Processed tokens
+        """
         if type(x_str) not in (list, tuple):
             raise TypeError("The input must be LIST type or TUPLE type")
         if type(aspect_str) not in (list, tuple):
@@ -113,12 +168,20 @@ class DTLLayer(nn.Module):
         return np.asarray(total_slices, dtype=np.int64)
 
     def tokenize_aspect(self, aspect_str):
+        """Transfer the raw aspects into token representations"""
         aspect_tokens = list()
         for item in aspect_str:
             aspect_tokens.append(self.tokenizer.text_to_sequence(item, maxlen=self.opt.max_aspect_len))
         return np.asarray(aspect_tokens, dtype=np.int64)
 
     def forward(self, x_str, aspect_str, trans_method):
+        """
+
+        :param x_str: All raw texts
+        :param aspect_str: All raw aspects
+        :param trans_method: The chosen data transformation method.
+        :return:
+        """
         assert len(x_str) == len(aspect_str)
 
         if trans_method == "splitting":
@@ -142,6 +205,12 @@ class NormalDTLLayer(DTLLayer):
 
 class NoAspectDTLLayer(DTLLayer):
     def text_preprocessing(self, x_str, **kwargs):
+        """
+        THe DTL layer that filters all aspects in texts.
+        :param x_str: All raw texts
+        :param kwargs: ...
+        :return: Texts without aspect strings.
+        """
         new_x_str = copy.deepcopy(x_str)
         aspect_str = kwargs["aspect_str"]
         assert len(new_x_str) == len(aspect_str)
@@ -188,6 +257,9 @@ class NoAspectDTLLayer(DTLLayer):
 
 
 class PositionDTLLayer(DTLLayer):
+    """
+    The DTL layer that can also return positions of each appearance of aspect.
+    """
     def text_preprocessing(self, x_str, **kwargs):
         return x_str
 

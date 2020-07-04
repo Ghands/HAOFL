@@ -7,6 +7,13 @@ from layers import NormalDTLLayer, PositionDTLLayer, FixedSALLayer
 
 class FixedHAOFL(nn.Module):
     def __init__(self, opt, tokenizer, embedding_matrix, fixed_dim):
+        """
+        The HAOFL framework with fixed hidden size of LSTM used in SAL layer
+        :param opt: The instance contains all hyper-parameters
+        :param tokenizer: Words tokenizer
+        :param embedding_matrix: The word2vec dictionary contains all words used in document-level ABSC dataset.
+        :param fixed_dim: The fixed hidden size of LSTM.
+        """
         super(FixedHAOFL, self).__init__()
 
         self.dtl = NormalDTLLayer(opt, tokenizer)
@@ -35,6 +42,14 @@ class FixedHAOFL(nn.Module):
 
 class PositionFixedHAOFL(FixedHAOFL):
     def __init__(self, opt, tokenizer, embedding_matrix, fixed_dim):
+        """
+        The HAOFL framework with fixed hidden size of LSTM used in SAL layer and
+        position encoding method used in DPL layer and DTL layer
+        :param opt:
+        :param tokenizer:
+        :param embedding_matrix:
+        :param fixed_dim:
+        """
         super(PositionFixedHAOFL, self).__init__(opt, tokenizer, embedding_matrix, fixed_dim)
 
         self.dtl = PositionDTLLayer(opt, tokenizer)

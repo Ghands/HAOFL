@@ -52,6 +52,7 @@ class IANDPL(DPLLayer):
 
 
 class IANHAOFL(HAOFL):
+    """A model constructed with HAOFL framework, IAN is the model used in DPL layer, and LSTM is used in SAL layer."""
     def __init__(self, opt, tokenizer, embedding_matrix):
         super(IANHAOFL, self).__init__(opt, tokenizer, embedding_matrix, 2)
 

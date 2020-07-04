@@ -88,6 +88,7 @@ class TNETDPL(PositionDPLLayer):
 
 
 class TNETHAOFL(PositionFixedHAOFL):
+    """A model constructed with HAOFL framework, TNET is the model used in DPL layer, and LSTM is used in SAL layer."""
     def __init__(self, opt, tokenizer, embedding_matrix, fixed_dim=50):
         super(TNETHAOFL, self).__init__(opt, tokenizer, embedding_matrix, fixed_dim)
 

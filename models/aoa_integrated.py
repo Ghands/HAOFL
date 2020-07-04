@@ -10,6 +10,7 @@ from frameworks import HAOFL
 
 
 class AOADPL(DPLLayer):
+    """The DPL layer implemented with AOA model"""
     def __init__(self, embedding_matrix, opt):
         super(AOADPL, self).__init__(opt)
 
@@ -45,6 +46,7 @@ class AOADPL(DPLLayer):
 
 
 class AOAHAOFL(HAOFL):
+    """A model constructed with HAOFL framework, AOA is the model used in DPL layer, and LSTM is used in SAL layer."""
     def __init__(self, opt, tokenizer, embedding_matrix):
         super(AOAHAOFL, self).__init__(opt, tokenizer, embedding_matrix, 2)
 

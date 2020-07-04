@@ -115,6 +115,7 @@ class MGANDPL(PositionDPLLayer):
 
 
 class MGANHAOFL(PositionHAOFL):
+    """A model constructed with HAOFL framework, MGAN is the model used in DPL layer, and LSTM is used in SAL layer."""
     def __init__(self, opt, tokenizer, embedding_matrix):
         super(MGANHAOFL, self).__init__(opt, tokenizer, embedding_matrix, 8)
 

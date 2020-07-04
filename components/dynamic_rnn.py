@@ -8,15 +8,15 @@ class DynamicLSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers=1, bias=True, batch_first=True, dropout=0,
                  bidirectional=False, only_use_last_hidden_state=False, rnn_type='LSTM'):
         """
-        LSTM which can hold variable length sequence, use like TensorFlow's RNN(input, length...).
+        A wrapper of LSTM network that can handle arbitrary length of input sequence
 
-        :param input_size:The number of expected features in the input x
-        :param hidden_size:The number of features in the hidden state h
-        :param num_layers:Number of recurrent components.
-        :param bias:If False, then the layer does not use bias weights b_ih and b_hh. Default: True
-        :param batch_first:If True, then the input and output tensors are provided as (batch, seq, feature)
-        :param dropout:If non-zero, introduces a dropout layer on the outputs of each RNN layer except the last layer
-        :param bidirectional:If True, becomes a bidirectional RNN. Default: False
+        :param input_size: The dimension of the input x
+        :param hidden_size: The dimension of vectors during computation
+        :param num_layers: The number of stacked LSTMs
+        :param bias: The `b` in `XW + b`
+        :param batch_first: If `True`, the meaning of the first dimension of input should be batch size
+        :param dropout: Randomly ignore some elements during computation by the rate, which can reduce over-fitting
+        :param bidirectional: If `True`, the structure will consist of a forward LSTM and backward LSTM.
         :param rnn_type: {LSTM, GRU, RNN}
         """
         super(DynamicLSTM, self).__init__()

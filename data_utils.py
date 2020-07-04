@@ -12,6 +12,14 @@ from layers import NormalDTLLayer, NoAspectDTLLayer, PositionDTLLayer
 
 
 def build_tokenizer(fnames, max_seq_len, dat_fname):
+    """
+    Obtain a coarse-grain word tokenizer. A pattern surrounded by space will be a token
+
+    :param fnames: The name of file that stores all tokens of a tokenizer
+    :param max_seq_len: The default length of sequence that produced by this tokenizer
+    :param dat_fname: The file that stores pre-defined tokens
+    :return: Tokenizer()
+    """
     if os.path.exists(dat_fname):
         print('loading tokenizer:', dat_fname)
         tokenizer = pickle.load(open(dat_fname, 'rb'))
@@ -44,6 +52,14 @@ def _load_word_vec(path, word2idx=None):
 
 
 def build_embedding_matrix(word2idx, embed_dim, dat_fname):
+    """
+    Form a matrix that stores the word vectors of all words in this document-level dataset.
+
+    :param word2idx: The mapping of word and id
+    :param embed_dim: The pre-trained vectors of all words, GLOVE is used.
+    :param dat_fname: The file stores all word vectors that will be used in this dataset.
+    :return: np.array() with shape [-1, 300]
+    """
     if os.path.exists(dat_fname):
         print('loading embedding_matrix:', dat_fname)
         embedding_matrix = pickle.load(open(dat_fname, 'rb'))
@@ -64,6 +80,19 @@ def build_embedding_matrix(word2idx, embed_dim, dat_fname):
 
 
 def pad_and_truncate(sequence, maxlen, dtype='int64', padding='post', truncating='post', value=0):
+    """
+    Make all vectors in an array be the fixed length.
+
+    :param sequence: The single vector should be the fixed length.
+    :param maxlen: The fixed length
+    :param dtype: The data type of initial array.
+    :param padding: Pad desirable value before or behind the elements if the length is less than the fixed length.
+    `post` means the end.
+    :param truncating: Truncate the front or end elements if the length is bigger than the fixed length.
+    `post` means the end.
+    :param value: The default value
+    :return: np.array() with shape (maxlen, )
+    """
     x = (np.ones(maxlen) * value).astype(dtype)
     if truncating == 'pre':
         trunc = sequence[-maxlen:]
@@ -79,6 +108,12 @@ def pad_and_truncate(sequence, maxlen, dtype='int64', padding='post', truncating
 
 class Tokenizer(object):
     def __init__(self, max_seq_len, lower=True):
+        """
+        Coarse-grained tokenizer
+
+        :param max_seq_len: The default length for output sequence
+        :param lower: If true, all character will be transformed into lowercase.
+        """
         self.lower = lower
         self.max_seq_len = max_seq_len
         self.word2idx = {}
@@ -86,6 +121,12 @@ class Tokenizer(object):
         self.idx = 1
 
     def fit_on_text(self, text):
+        """
+        Build the mapping between words and ids.
+
+        :param text: The raw text.
+        :return:
+        """
         if self.lower:
             text = text.lower()
         words = text.split()
@@ -96,6 +137,18 @@ class Tokenizer(object):
                 self.idx += 1
 
     def text_to_sequence(self, text, reverse=False, padding='post', truncating='post', maxlen=None):
+        """
+        Transform the raw text or text list into a fixed length sequence that is full with tokens.
+
+        :param text: The raw text or text list
+        :param reverse: If true, all words will be analyzed backward.
+        :param padding: Pad desirable value before or behind the elements if the length is less than the fixed length.
+        `post` means the end.
+        :param truncating: Truncate the front or end elements if the length is bigger than the fixed length.
+        `post` means the end.
+        :param maxlen: The user-defined length.
+        :return: np.array() with shape (maxlen,) or (self.maxlen,)
+        """
         if maxlen is None:
             maxlen = self.max_seq_len
         if type(text) == list:
@@ -115,10 +168,30 @@ class Tokenizer(object):
 
 class Tokenizer4Bert(object):
     def __init__(self, max_seq_len, pretrained_bert_name):
+        """
+        Build a tokenizer for BERT model.
+        The results produced by this tokenizer is different from the results produces by
+        normal `Tokenizer` even though the input text is the same.
+
+        :param max_seq_len: The default length of produced sequence
+        :param pretrained_bert_name: The name of used BERT model
+        """
         self.tokenizer = BertTokenizer.from_pretrained(pretrained_bert_name)
         self.max_seq_len = max_seq_len
 
     def text_to_sequence(self, text, reverse=False, padding='post', truncating='post', maxlen=None):
+        """
+        Transform the raw text or text list into a fixed length sequence that is full with tokens.
+
+        :param text: The raw text or text list
+        :param reverse: If true, all words will be analyzed backward.
+        :param padding: Pad desirable value before or behind the elements if the length is less than the fixed length.
+        `post` means the end.
+        :param truncating: Truncate the front or end elements if the length is bigger than the fixed length.
+        `post` means the end.
+        :param maxlen: The user-defined length.
+        :return: np.array() with shape (maxlen,) or (self.maxlen,)
+        """
         if maxlen is None:
             maxlen = self.max_seq_len
         if type(text) == list:
@@ -134,6 +207,16 @@ class Tokenizer4Bert(object):
 
 class TrainDataset(Dataset):
     def __init__(self, file_name, tokenizer, opt, trans_method, dtl_param, name_tail):
+        """
+        Build a dataset for training.
+
+        :param file_name: The file stores pre-processed results.
+        :param tokenizer: Used tokenzier.
+        :param opt: A object stores all hyper-parameters.
+        :param trans_method: The chosen method of DTL layer. `splitting`, `sliding`, `filter` are all candidates.
+        :param dtl_param: A string indicates the parameters of `trans_method`, which will form the storage file name.
+        :param name_tail: A user-defined string, which is also used to form the storage file name.
+        """
         super(TrainDataset, self).__init__()
 
         cached_file_name = '{}_{}-{}_{}.cached'.format(file_name, trans_method, dtl_param, name_tail)

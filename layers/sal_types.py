@@ -8,14 +8,33 @@ from components import DynamicLSTM
 
 class SALLayer(nn.Module):
     def __init__(self, opt):
+        """
+        The Sentiment Aggregation Layer.
+        :param opt:
+        """
         super(SALLayer, self).__init__()
 
         self.opt = opt
 
     def sal_model(self, result_vector, result_len):
+        """
+        The model structure that used in SAL layer.
+        :param result_vector: The output hidden state of previous layers.
+        :param result_len: The non-zero lengths of input.
+        :return: The final sentiment representations of documents
+        """
         raise NotImplementedError("The SAL must be implemented!")
 
     def forward(self, result_vector, group, true_batch_size, slice_num, dpl_mode):
+        """
+
+        :param result_vector: The output hidden state of previous layers.
+        :param group: The vector indicates the document of every slice belong to.
+        :param true_batch_size: The batch_size hyper-parameter
+        :param slice_num: The number of text slices
+        :param dpl_mode: The mode chosen in DPL layer.
+        :return: The final sentiment representation of documents
+        """
         if dpl_mode != "encoder":
             raise ValueError("The mode of previous DPL must be ENCODER")
 
@@ -46,6 +65,9 @@ class NormalSALLayer(SALLayer):
 
 
 class FixedSALLayer(SALLayer):
+    """
+    SAL layer with fixed dimension of the used LSTM network.
+    """
     def __init__(self, opt, fixed_dim):
         super(FixedSALLayer, self).__init__(opt)
 

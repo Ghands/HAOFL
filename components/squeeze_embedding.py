@@ -6,7 +6,8 @@ import torch.nn as nn
 
 class SqueezeEmbedding(nn.Module):
     """
-    Squeeze sequence embedding length to the longest one in the batch
+    Reduce the length of input sequence by ignoring the positions whose values are all the 0 elements
+    in each input vector
     """
     def __init__(self, batch_first=True):
         super(SqueezeEmbedding, self).__init__()

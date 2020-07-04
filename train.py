@@ -27,6 +27,11 @@ logger.addHandler(logging.StreamHandler(sys.stdout))
 
 class Runner(object):
     def __init__(self, opt, dtl_param):
+        """
+        A wrapper for running HAOFL based models.
+        :param opt: An object stores all hyper-parameters
+        :param dtl_param: A string indicates that parameter of used data transformation method used in DTL layer.
+        """
         self.opt = opt
 
         if 'bert' in self.opt.model_name:
@@ -68,6 +73,7 @@ class Runner(object):
             logger.info('>>> {0}: {1}'.format(arg, getattr(self.opt, arg)))
 
     def _reset_params(self):
+        """Initialize the values of all possible parameters"""
         for child in self.model.children():
             if type(child) != BertModel:  # skip bert params
                 for p in child.parameters():
@@ -94,6 +100,7 @@ class Runner(object):
                 # clear gradient accumulators
                 optimizer.zero_grad()
 
+                # Construct the input data.
                 if self.opt.model_name in with_position_models:
                     inputs = {"text": sample_batched["text"].to(self.opt.device),
                               'aspect': sample_batched['aspect'].to(self.opt.device),
@@ -232,6 +239,7 @@ def main():
 
     opt = parser.parse_args()
 
+    # initialize the random seed.
     if opt.seed is not None:
         random.seed(opt.seed)
         numpy.random.seed(opt.seed)
@@ -240,6 +248,7 @@ def main():
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
+    # Mapping the model name to model classes.
     model_classes = {
         'baseline': BaselineHAOFL,
         'atae': ATAEHAOFL,
@@ -252,6 +261,7 @@ def main():
         'bert': BertHAOFL
     }
 
+    # The fila of used document-level dataset.
     dataset_files = {
         "document-level": {
             "train": "./datasets/train.raw",
@@ -282,6 +292,7 @@ def main():
     opt.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu') \
         if opt.device is None else torch.device(opt.device)
 
+    # Generate the name of the log file that stores the process of running.
     if opt.dtl_method == "splitting":
         dtl_param = opt.split_size
     elif opt.dtl_method == "sliding":
@@ -293,6 +304,7 @@ def main():
     log_file = '{}/{}_{}-{}_{}.log'.format(log_dir, opt.model_name, opt.dtl_method, dtl_param,
                                            strftime("%y%m%d-%H%M", localtime()))
 
+    # Logger.
     fmt = '%(asctime)s: %(message)s'
     format_str = logging.Formatter(fmt)
     log_fh = logging.FileHandler(log_file)
