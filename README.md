@@ -23,12 +23,12 @@ and text filter. Splitting window and sliding window will obtain little text sli
 the number of words, while text filter can locate target aspects and extract neighbor
 sentences.
 2. Dependency Processing Layer (DPL) can analyze the sentiment dependency in a text
-slice. There are two mode in this layer, encoder mode and analysis mode. Encoder mode
-analyzes the single text slice and generate the sentiment representation of this text
-slice. Analysis mode study the sentiment information of all text slices and obtain
+slice. There are two modes in this layer, encoder mode and analysis mode. Encoder mode
+analyzes the single text slice and generates the sentiment representation of this text
+slice. Analysis mode studies the sentiment information of all text slices and obtains
 the overall sentiment representation of the document. Notably, analysis mode can be 
 chosen only when text filter is the data transformation method in DTL. The model used
-in DPL can be sentence-level ABSC models, but these model should adjust for some 
+in DPL can be sentence-level ABSC models, but these models should adjust for some 
 differences between documents and sentences.
 3. Sentiment Aggregation Layer (SAL) can aggregate the local sentiment representation 
 of text slices and produce a global sentiment representation of the whole document.
@@ -61,7 +61,7 @@ python3 train.py --model_name <name of the model>
 
 We have implemented 9 types of HAOFL based model, except for the baseline, we also 
 integrated sentence-level ABSC models, ATAE, IAN, Memory Network, AOA, RAM, TNET, 
-MGAN, and BERT. Running command for these models are the following.
+MGAN, and BERT. Running commands for these models are the following.
 
 - Baseline
 
@@ -117,8 +117,8 @@ MGAN, and BERT. Running command for these models are the following.
   python3 train.py --model_name bert --device cuda:1 --dtl_method <method_name> --dpl_mode <mode_choice> --embed_dim 768 --hidden_dim 768 --batch_size 1 --learning_rate 0.00001 
   ```
 
-Notably, the `name_tail` is a tag for self-defined data pre-processing method. For 
-example, RAM, TNET, and MGAN all adopt relative position encoding method, so we 
+Notably, the `name_tail` is a tag for a self-defined data pre-processing method. For 
+example, RAM, TNET, and MGAN all adopt relative position encoding methods, so we 
 implement a subclass for DTL layer, and the `name_tail` is `position`. When BERT is 
 integrated, the GPU RAM is out of the bound, so we assign the `batch_size` to 1.
 
@@ -136,7 +136,7 @@ The running situation of these models are shown in following table.
 | mgan       | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: | :heavy_check_mark: |
 | bert       | :heavy_check_mark: | :x:                | :heavy_check_mark: | :x:                |
 
-The meaning of latter four columns are:
+The meaning of the latter four columns are:
 
 - Splitting Window: "splitting window" method in DTL layer and "encoder" mode in 
 DPL layer.
@@ -151,5 +151,5 @@ There are two failures:
 2. The input of BERT integrated model with "analysis" mode in DPL is too long, which 
 exceeds 512.
 
-Among all methods, we recommand the approach "text filter" method with "encoder",
-which not only runs faster, but also performs better.
+Among all methods, we recommend the approach "text filter" method with "encoder",
+which not only runs faster but also performs better.
