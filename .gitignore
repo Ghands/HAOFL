@@ -2,6 +2,9 @@
 *.log
 *.dat
 *.cached
+*.full
+*.source
+*.ipynb
 glove*
 
 .idea/
@@ -9,4 +12,3 @@ pretrained/
 __pycache__/
 state_dict/
 running_logs/
-datasets/

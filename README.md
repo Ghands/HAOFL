@@ -153,3 +153,23 @@ exceeds 512.
 
 Among all methods, we recommend the approach "text filter" method with "encoder",
 which not only runs faster but also performs better.
+
+## Document-level Dataset: AOLTD
+
+Aspect-Oriented Long Text Dataset is a document-level dataset contains the contexts 
+we collected. Corresponding aspects and polarities are obtained by Guoxin Cloud
+Service Co., Ltd. manually. Some information about AOLTD is show in following table.
+
+| Set Type           | Positive | Neutral | Negative |
+| ------------------ | -------- | ------- | -------- |
+| Training(full)     | 799      | 1597    | 1597     |
+| Test(full)         | 234      | 817     | 652      |
+| Training(released) | 200      | 400     | 400      |
+| Test(released)     | 100      | 200     | 200      |
+
+The shortest content in AOLTD is about 140 words, which is longer than the longest
+content in normal sentence-level datasets, e.g. Semeval-14 laptop, Semeval-14 
+restaurant, and Twitter.
+
+For some special reasons, we release a part of AOLTD now. The full version of AOLTD
+will be released in the near future. 
