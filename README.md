@@ -173,3 +173,7 @@ restaurant, and Twitter.
 
 For some special reasons, we release a part of AOLTD now. The full version of AOLTD
 will be released in the near future. 
+
+---
+
+Questions are welcome in 'Issue' module of this repository.
