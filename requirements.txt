@@ -1,4 +1,4 @@
 pytorch==1.4.0
-numpy==1.18.2
+numpy==1.22.0
 ransformers==2.9.1
 spacy==2.2.4
